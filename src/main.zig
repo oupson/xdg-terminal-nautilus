@@ -31,10 +31,10 @@ export fn nautilus_module_initialize(module: [*c]C.GTypeModule) void {
     C.g_type_module_add_interface(module, plugin_type[0], C.nautilus_menu_provider_get_type(), &ifaceInfo);
 }
 
-fn iface_init(ptr: ?*anyopaque, ptr2: C.gpointer) callconv(.C) void {
-    _ = ptr2;
+fn iface_init(g_iface: ?*anyopaque, iface_data: C.gpointer) callconv(.C) void {
+    _ = iface_data;
 
-    const iface: ?*C.NautilusMenuProviderInterface = @ptrCast(@alignCast(ptr));
+    const iface: ?*C.NautilusMenuProviderInterface = @ptrCast(@alignCast(g_iface));
     if (iface) |i| {
         i.get_background_items = get_background_items;
     }
@@ -46,14 +46,22 @@ fn get_background_items(provider: ?*C.NautilusMenuProvider, item: ?*C.NautilusFi
 
     var menu_item = C.nautilus_menu_item_new("xdg-open-terminal-open-in-dir", "Open terminal here", null, null);
 
-    const location = C.g_object_ref(C.nautilus_file_info_get_location(item));
+    const location = C.nautilus_file_info_get_location(item);
 
-    _ = C.g_signal_connect_data(menu_item, "activate", @as(C.GCallback, @ptrCast(@alignCast(&open_terminal_called))), location, null, std.zig.c_translation.cast(C.GConnectFlags, @as(c_int, 0)));
+    _ = C.g_signal_connect_object(
+        menu_item,
+        "activate",
+        @as(C.GCallback, @ptrCast(@alignCast(&open_terminal_called))),
+        location,
+        std.zig.c_translation.cast(C.GConnectFlags, @as(c_int, 0)),
+    );
     result = C.g_list_prepend(result, menu_item);
     return result;
 }
 
 fn open_terminal_called(self: [*c]C.NautilusMenuItem, user_data: C.gpointer) callconv(.C) void {
+    _ = self;
+
     if (@as(?*C.GFile, @ptrCast(user_data))) |location| {
         const direct_allocator = std.heap.c_allocator;
 
@@ -61,10 +69,7 @@ fn open_terminal_called(self: [*c]C.NautilusMenuItem, user_data: C.gpointer) cal
         spawn_in(direct_allocator, path) catch |e| {
             std.debug.print("failed to spawn {?}", .{e});
         };
-
-        C.g_object_unref(location);
     }
-    _ = self;
 }
 
 fn spawn_in(allocator: std.mem.Allocator, path: [*:0]u8) !void {
