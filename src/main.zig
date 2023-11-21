@@ -75,7 +75,8 @@ fn spawn_in(allocator: std.mem.Allocator, path: [*:0]u8) !void {
         "cd {s} && {s}",
         .{ path, shell },
     );
-    _ = try std.ChildProcess.exec(.{ .allocator = allocator, .argv = &[_][]const u8{ "xdg-terminal-exec", string }, .cwd = null });
+    var child_process = std.ChildProcess.init(&[_][]const u8{ "xdg-terminal-exec", string }, allocator);
+    try child_process.spawn();
 
     allocator.free(string);
 }
